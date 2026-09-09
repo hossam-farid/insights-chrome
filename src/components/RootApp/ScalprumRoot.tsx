@@ -1,6 +1,6 @@
-import React, { Component, ReactNode, Suspense, memo, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import React, { Suspense, memo, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { PluginManifest, RemotePluginManifest } from '@openshift/dynamic-plugin-sdk';
-import { ScalprumComponent, ScalprumProvider, ScalprumProviderConfigurableProps } from '@scalprum/react-core';
+import { ScalprumProvider, ScalprumProviderConfigurableProps } from '@scalprum/react-core';
 import { Route, Routes } from 'react-router-dom';
 import { ChromeAPI } from '@redhat-cloud-services/types';
 import { ChromeProvider } from '@redhat-cloud-services/chrome';
@@ -35,12 +35,14 @@ import useHandlePendoScopeUpdate from '../../hooks/useHandlePendoScopeUpdate';
 import { activeModuleAtom } from '../../state/atoms/activeModuleAtom';
 import { ScalprumConfig } from '../../state/atoms/scalprumConfigAtom';
 import transformScalprumManifest from './transformScalprumManifest';
+import QuickstartsRuntimeMount from './QuickstartsRuntimeMount';
 import { segmentPageOptionsAtom } from '../../state/atoms/segmentPageOptionsAtom';
 import useDPAL from '../../analytics/useDpal';
 import { selectedTagsAtom } from '../../state/atoms/globalFilterAtom';
 import useAmplitude from '../../analytics/useAmplitude';
 import usePf5Styles from '../../hooks/usePf5Styles';
-import { LiveQuickstartsAPI, liveHelpTopicsAPIRef, liveQuickstartsAPIRef, remoteActiveQuickStartIDAtom } from '../../state/atoms/remoteQuickstartsAtom';
+import { LiveQuickstartsAPI, liveHelpTopicsAPIRef, liveQuickstartsAPIRef } from '../../state/atoms/remoteQuickstartsAtom';
+import type { QuickStart } from '@patternfly/quickstarts';
 
 const ProductSelection = lazyWithRetry(() => import('../Stratosphere/ProductSelection'));
 const Lightwell = lazyWithRetry(() => import('../../layouts/Lightwell'));
@@ -55,59 +57,6 @@ const useGlobalFilter = (callback: (selectedTags?: FlagTagsFilter) => any) => {
   }, [selectedTags, callback]);
 
   return callback(selectedTags);
-};
-
-class QuickstartsRuntimeBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error: unknown) {
-    console.error('Quickstarts runtime failed:', error);
-  }
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
-}
-
-const PassThrough = ({ children }: { children?: ReactNode; error?: unknown }) => <>{children}</>;
-
-const QuickstartsRuntimeMount = ({ children }: { children: ReactNode }) => {
-  const { user } = useContext(ChromeAuthContext);
-  const activeModule = useAtomValue(activeModuleAtom);
-  const setRemoteActiveQSID = useSetAtom(remoteActiveQuickStartIDAtom);
-
-  const handleApiReady = useCallback((api: { quickstartsAPI: LiveQuickstartsAPI; helpTopicsAPI: ChromeAPI['helpTopics'] }) => {
-    liveQuickstartsAPIRef.current = api.quickstartsAPI;
-    liveHelpTopicsAPIRef.current = api.helpTopicsAPI;
-  }, []);
-
-  const handleActiveQSChanged = useCallback(
-    (id: string) => {
-      setRemoteActiveQSID(id);
-    },
-    [setRemoteActiveQSID]
-  );
-
-  return (
-    <QuickstartsRuntimeBoundary fallback={children}>
-      <ScalprumComponent
-        scope="learningResources"
-        module="./QuickstartsRuntime"
-        ErrorComponent={<PassThrough>{children}</PassThrough>}
-        fallback={children}
-        accountId={user?.identity?.internal?.account_id}
-        activeModule={activeModule}
-        onApiReady={handleApiReady}
-        onActiveQuickStartChanged={handleActiveQSChanged}
-      >
-        {children}
-      </ScalprumComponent>
-    </QuickstartsRuntimeBoundary>
-  );
 };
 
 const ScalprumRoot = memo(
@@ -179,8 +128,8 @@ const delegatedQuickstartsAPI: LiveQuickstartsAPI = {
     const Catalog = liveQuickstartsAPIRef.current?.Catalog;
     return Catalog ? <Catalog {...props} /> : null;
   }) as ChromeAPI['quickStarts']['Catalog'],
-  updateQuickStarts: (key: string, quickstarts: unknown[]) => liveQuickstartsAPIRef.current?.updateQuickStarts?.(key, quickstarts),
-  add: (key: string, qs: unknown) => liveQuickstartsAPIRef.current?.add?.(key, qs) ?? false,
+  updateQuickStarts: (key: string, quickstarts: QuickStart[]) => liveQuickstartsAPIRef.current?.updateQuickStarts?.(key, quickstarts),
+  add: (key: string, qs: QuickStart) => liveQuickstartsAPIRef.current?.add?.(key, qs) ?? false,
 };
 
 const delegatedHelpTopicsAPI: ChromeAPI['helpTopics'] = {

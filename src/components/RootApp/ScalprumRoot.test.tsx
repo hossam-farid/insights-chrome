@@ -9,6 +9,11 @@ import { ChromeAPI } from '@redhat-cloud-services/types';
 import { NavItem, Navigation } from '../../@types/types';
 import { ScalprumConfig } from '../../state/atoms/scalprumConfigAtom';
 
+jest.mock('./QuickstartsRuntimeMount', () => ({
+  __esModule: true,
+  default: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+}));
+
 jest.mock('../Footer/Footer', () => () => null);
 
 let mockScalprumProviderProps: ScalprumProviderConfigurableProps<{ chrome: ChromeAPI }> | undefined;
